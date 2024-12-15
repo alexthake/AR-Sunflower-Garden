@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <script>
+      // WebXR requires https: to work so ensure redirected if needed.
+      if (location.hostname !== "localhost" && window.location.protocol === "http:" )
+        window.location.protocol = "https:";
+    </script>
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sunflower Grow - Alex Thake</title>
+  </head>
+  <style>
+    .a-enter-vr-button{
+      display: none;
+    }
+    .a-enter-ar-button{
+      display: none;
+    }
+  </style>
+  <!-- Packages -->
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://unpkg.com/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+  <script src="../static/ammo.wasm.js"></script>
+  <script src="https://unpkg.com/aframe-physics-system@4.0.1/dist/aframe-physics-system.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/IdeaSpaceVR/aframe-particle-system-component@latest/dist/aframe-particle-system-component.min.js"></script>
+
+  <!-- Local Components -->
+  <script src="components/ar-utils.js"></script>
+  <script src="components/actor-utils.js"></script>
+  <script src="components/planting-utils.js"></script>
+  <script src="components/physics-utils.js"></script>
+
+  <script>
+    let currentMode = 0
+    function swapSeeds() {
+      if(currentMode != 0) {
+        currentMode = 0
+        document.getElementById('pocketleft').emit('seedsEnter')
+        document.getElementById('pocketright').emit('waterLeave')
+        document.getElementById('throwButton').innerHTML = 'Throw Seed'
+        document.getElementById('camera').setAttribute('throw-seed', {
+            enabled: true,
+          }
+        )
+        document.getElementById('camera').setAttribute('watercan', {
+            enabled: false,
+          }
+        )
+      }
+    }
+    function swapWater() {
+      if(currentMode != 1) {
+        currentMode = 1
+        document.getElementById('pocketright').emit('waterEnter')
+        document.getElementById('pocketleft').emit('seedsLeave')
+        document.getElementById('throwButton').innerHTML = 'Water Target'
+        document.getElementById('camera').setAttribute('throw-seed', {
+            enabled: false,
+          }
+        )
+        document.getElementById('camera').setAttribute('watercan', {
+            enabled: true,
+          }
+        )
+      }
+    }
+    function closeOnboarding() {
+      document.getElementById('onboarding').style.display = "none"
+    }
+    function openOnboarding() {
+      document.getElementById('onboarding').style.display = "flex"
+    }
+  </script>
+
+  <body>
+    <!-- HTML Overlay for AR -->
+    <div id="onboarding" style="display: flex; flex-direction: column; background-color: green; border-radius: 1rem; border: solid 2px black; height: 98%; width: 92%; z-index: 2; 
+      position: absolute; top: 50%; left: 50%; translate: -50% -50%; overflow-y: scroll; overflow-x: visible;">
+      <button onclick="closeOnboarding()" style="position: absolute; right: 2%; top: 1%; width: 2rem; height: 2rem; font-size: 1rem; font-weight: bold; background-color: white; border: none; border-radius: 0.5rem;">
+        X
+      </button>
+      <div style="padding: 1rem;">
+        <p style="font-size: 2rem; margin: 0;">Instructions</p>
+        <div style="display: flex; flex-direction: column; margin: 1rem 0 1rem 0;">
+          When you enter AR, look around your space until a shadow appears. Tap the shadow to place soil at that position.
+          <img src="../static/images/placement.jpg" style="margin-top: 1rem;" />
+        </div>
+        <div style="display: flex; flex-direction: column; margin: 1rem 0 1rem 0;">
+          Tap to select either the seed packet or watering can to use, and then tap in the center to use it.
+          <img src="../static/images/toolselect.jpg" style="margin-top: 1rem;" />
+        </div>
+        <div style="display: flex; flex-direction: column; margin: 1rem 0 1rem 0;">
+          Plant a seed in the dirt, and then water twice to grow a sunflower. Remember to aim!
+          <img src="../static/images/watering.jpg" style="margin-top: 1rem;" />
+        </div>
+      </div>
+      <button onclick="closeOnboarding()" style="width: 90%; height: 2rem; font-size: 1rem; font-weight: bold; background-color: white; border: none; border-radius: 0.5rem; padding: 0.5rem; 
+        margin: 0 1rem 1rem 1rem">
+        Got it
+      </button>
+    </div>
+    <div id="overlay" style="position: absolute; z-index: 1; ">
+      <header>
+        <button id="help" onclick="openOnboarding()" style="position: absolute; right: 4%; top: 2%; width: 2rem; height: 2rem; font-size: 1rem; font-weight: bold; background-color: green; border: none; border-radius: 0.5rem;">
+          ?
+        </button>
+        <p id="hint" style="text-align: center; position: absolute; bottom: 50px; left: 50%; right: 50%; translate: -50%; width: 75%;">Look around an open space until the marker appears and tap to place the object</p>
+        <button id="throwButton"
+        style="padding: 10px 20px; width: 50%; height: 300px; position: absolute; bottom: 0; left: 50%; right: 50%; translate: -50%; display: none; background-color: none; border: none; opacity: 0%;">Throw Seed</button>
+        <button id="seedButton" onclick="swapSeeds()"
+        style="padding: 5px 5px; width: 25%; height: 300px; position: absolute; bottom: 0; left: 0; display: block; background-color: green; border: none; opacity: 0%;"">Swap to seeds</button>
+        <button id="waterButton" onclick="swapWater()"
+        style="padding: 5px 5px; width: 25%; height: 300px; position: absolute; bottom: 0; right: 0; display: block; background-color: blue; border: none; opacity: 0%;">Swap to watering can</button>
+        <button id="arButton"
+        style="padding: 10px 20px; width: 200px; position: absolute; bottom: 10px; left: 50%; right: 50%; translate: -50%; display: block;">Enter AR</button>
+      </header>
+    </div>
+
+    <!-- Aframe Scene -->
+    <a-scene id="scene" webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #overlay;" button-enter-ar="buttonID: #arButton;"
+    ar-hit-test="target:#soil;" ar-place-once reflection="directionalLight:#dirlight;"
+    physics=" driver: ammo; debug: false; debugDrawMode: 1; iterations: 100; maxSubSteps: 4; fixedTimeStep: 0.01667"
+    renderer="antialias: true; highRefreshRate: true; colorManagement: true; sortObjects: false; logarithmicDepthBuffer: true; physicallyCorrectLights: true; maxCanvasWidth: 1920; maxCanvasHeight: 1920; foveationLevel: 0;"
+    gltf-model="dracoDecoderPath: https://cdn.jsdelivr.net/npm/three@0.129.0/examples/js/libs/draco/gltf/;">
+      <a-assets>
+        <a-asset-item
+          id="soil-glb"
+          src="models/DugSoil.glb"
+        ></a-asset-item>
+        <a-asset-item
+          id="seed-glb"
+          src="models/Sunflower_seed.glb"
+        ></a-asset-item>
+        <a-asset-item
+          id="sunflower-glb"
+          src="models/SunFlower.glb"
+        ></a-asset-item>
+        <a-asset-item
+          id="seedpack-glb"
+          src="models/SeedPacket.glb"
+        ></a-asset-item>
+        <a-asset-item
+          id="wateringcan-glb"
+          src="models/WateringCan.glb"
+        ></a-asset-item>
+        <audio id="pvz-mp3" src="../static/sounds/pvz.mp3" preload="auto"></audio>
+      </a-assets>
+
+      <!-- Camera -->
+      <a-entity id="camera" position="0 1.15 0" rotation="0 0 0" camera mouse-cursor 
+        throw-seed="buttonID: #throwButton; modelID: #seed-glb; soilID: #soil; power: 6; enabled: true;"
+        watercan="buttonID: #throwButton; wateringCanID: #wateringcan; raycasterID: #raycaster; enabled: false;">
+        <a-entity id="raycaster" raycaster="objects: .waterable; showLine:true;" position="0 0 0"></a-entity>
+        <a-entity cursor="fuse: true; fuseTimeout: 500" position="0 0 -1" geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03" material="color: black; shader: flat"></a-entity>
+        <a-entity id="pocketleft" position="0 -0.3 -0.5" show-on-place-ar visible="true"
+          animation__enter="property: position; from: -0.15 -0.3 -0.5; to: 0 -0.3 -0.5; dur: 500; delay: 150; startEvents: seedsEnter; autoplay: true;"
+          animation__leave="property: position; from: -0 -0.3 -0.5; to: -0.15 -0.3 -0.5; dur: 500; startEvents: seedsLeave;">
+          <a-entity id="seedpacket" position="0 0 0" gltf-model="#seedpack-glb" visible="false" show-on-place-ar></a-entity>
+        </a-entity>
+        <a-entity id="pocketright" position="0.15 -0.3 -0.45" show-on-place-ar visible="true"
+          animation__enter="property: position; from: 0.15 -0.3 -0.5; to: 0 -0.3 -0.5; dur: 500; delay: 150;  startEvents: waterEnter;"
+          animation__leave="property: position; from: 0 -0.3 -0.5; to: 0.15 -0.3 -0.5; dur: 500; startEvents: waterLeave; autoplay: true;">
+          <a-entity id="wateringcan" position="0 0 0" rotation="0 -140 0" gltf-model="#wateringcan-glb" scale="0.75 0.75 0.75" visible="false" show-on-place-ar watering="false"
+          animation__tipping="property: rotation; from: 0 -140 0; to: 60 -140 0; dur: 1200; dir: alternate; startEvents: water;"
+          animation__untipping="property: rotation; from: 60 -140 0; to: 0 -140 0; dur: 1200; dir: alternate; startEvents: stopwater;">
+          </a-entity>
+        </a-entity>
+      </a-entity>
+
+      <!-- Lighting -->
+      <a-entity light="type: ambient; color: #FFF; intensity: 0.15"></a-entity>
+      <a-light id="dirlight" intensity="1" light="castShadow:true; type:directional" position="2 2 2"></a-light>
+      <a-entity light="type: spot; angle: 15; target: #lightTarget1;" position="1.5 3 1" rotation="0 45 0"></a-entity>
+
+      <!-- Sound -->
+      <a-entity id="soundtrack" sound="src: #pvz-mp3; loop: true"></a-entity>
+      <!-- <a-sound id="soundtrack" src="url(sounds/pvz.mp3)" loop="true" position="0 0 0"></a-sound> -->
+
+      <!-- Scene -->
+      <a-entity id="floor" position="0 -0.5 0" geometry="primitive: box; depth: 20; width: 40; height: 1;" visible="true" grip="0.9" material="color: lime;"
+      ammo-body="type: static;" ammo-shape="type: box;" hide-on-enter-ar></a-entity>
+
+      <a-entity id="soil" class="waterable" gltf-model="#soil-glb" hide-on-enter-ar show-on-place-ar="htmlID: #throwButton"
+        position="0 0 -3" rotation="0 0 0" scale="3 3 3"
+        ammo-body="type: kinematic; emitCollisionEvents: true; disableCollision: true;" ammo-shape="type: sphere; fit: manual; sphereRadius: 0.15; offset:0 0 0;">
+        <a-entity class="shoot" position="0 0 0" scale="0 0 0" geometry="primitive: cylinder; radius: 0.005; height: 0.04;" material="color: green;" visible="false" hide-on-enter-ar
+          animation__planted="property: scale; from: 0 0 0; to: 0.4 0.4 0.4; dur: 1000; startEvents: planted;"
+          animation__watered1="property: scale; from: 0.4 0.4 0.4; to: 0.8 0.8 0.8; dur: 1000; startEvents: water1;"
+          animation__watered2="property: scale; from: 0.8 0.8 0.8; to: 0 0 0; dur: 1000; delay:300; startEvents: water2;"></a-entity>
+        <a-entity class="sunflower" gltf-model="#sunflower-glb" hide-on-enter-ar
+          animation__watered="property: scale; from: 0 0 0; to: 0.8 0.8 0.8; dur: 3000; startEvents: water2;"></a-entity>
+      </a-entity>
+
+    </a-scene>
+  </body>
+</html>
